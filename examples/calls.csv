@@ -1,0 +1,4 @@
+url,customer_name,customer_number
+https://voicebot-calls-prod.s3.amazonaws.com/.../call1.wav?X-Amz-Signature=...,Rahul Sharma,9876543210
+https://voicebot-calls-prod.s3.amazonaws.com/.../call2.wav?X-Amz-Signature=...,Priya Mehta,9123456789
+/path/to/local/call3.wav,Amit Verma,9988776655

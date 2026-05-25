@@ -81,48 +81,106 @@ def dashboard(
 
 @app.command()
 def batch(
-    input_file: Path = typer.Argument(..., help="Text file with one audio URL or path per line"),
+    input_csv: Path = typer.Argument(..., help="CSV file with columns: url, customer_name, customer_number"),
     config: Optional[Path] = typer.Option(None, "--config", "-c"),
     model: Optional[str] = typer.Option(None, "--model", "-m"),
     min_severity: Optional[str] = typer.Option(None, "--min-severity"),
-    csv_out: Optional[Path] = typer.Option(None, "--csv", help="Write per-call flag CSV here"),
+    csv_out: Optional[Path] = typer.Option(
+        Path("reports/summary.csv"), "--csv", help="Write per-call flag summary CSV here"
+    ),
 ):
-    """Analyze many audio files; emit one report per call and an optional CSV summary."""
+    """Analyze many calls from a CSV (columns: url, customer_name, customer_number)."""
     import csv
-    cfg = _apply_overrides(load_config(config), model, min_severity, None)
-    sources = [l.strip() for l in input_file.read_text().splitlines() if l.strip() and not l.startswith("#")]
-    console.print(f"[bold]Processing {len(sources)} calls…[/bold]")
 
-    rows = []
-    for i, src in enumerate(sources, 1):
-        console.print(f"\n[bold cyan]({i}/{len(sources)}) {src}[/bold cyan]")
+    cfg = _apply_overrides(load_config(config), model, min_severity, None)
+
+    with open(input_csv, newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        # Normalise header names: strip whitespace, lowercase
+        rows_in = []
+        for row in reader:
+            rows_in.append({k.strip().lower(): v.strip() for k, v in row.items()})
+
+    if not rows_in:
+        console.print("[red]CSV is empty.[/red]")
+        raise typer.Exit(2)
+
+    required = {"url"}
+    missing = required - set(rows_in[0].keys())
+    if missing:
+        console.print(f"[red]CSV missing required column(s): {missing}. Headers found: {list(rows_in[0].keys())}[/red]")
+        raise typer.Exit(2)
+
+    console.print(f"[bold]Processing {len(rows_in)} calls…[/bold]")
+
+    out_rows = []
+    for i, row in enumerate(rows_in, 1):
+        src = row["url"]
+        name = row.get("customer_name", "")
+        number = row.get("customer_number", "")
+        label = f"{name} ({number})" if name or number else src
+        console.print(f"\n[bold cyan]({i}/{len(rows_in)}) {label}[/bold cyan]")
         try:
             result = analyze_audio(src, cfg)
-            render(result, cfg, src)
+            render(result, cfg, f"{label} — {src}")
             save(result, cfg, src)
-            for f in result.flags:
-                rows.append({
-                    "source": src,
+            if result.flags:
+                for fl in result.flags:
+                    out_rows.append({
+                        "customer_name": name,
+                        "customer_number": number,
+                        "url": src,
+                        "overall_severity": result.overall_severity,
+                        "call_summary": result.call_summary,
+                        "flag_category": fl.category,
+                        "flag_severity": fl.severity,
+                        "timestamp": fl.timestamp or "",
+                        "speaker": fl.speaker,
+                        "quote": fl.quote,
+                        "explanation": fl.explanation,
+                        "recommendation": fl.recommendation,
+                    })
+            else:
+                out_rows.append({
+                    "customer_name": name,
+                    "customer_number": number,
+                    "url": src,
                     "overall_severity": result.overall_severity,
-                    "category": f.category,
-                    "severity": f.severity,
-                    "timestamp": f.timestamp or "",
-                    "speaker": f.speaker,
-                    "quote": f.quote,
-                    "explanation": f.explanation,
+                    "call_summary": result.call_summary,
+                    "flag_category": "",
+                    "flag_severity": "",
+                    "timestamp": "",
+                    "speaker": "",
+                    "quote": "",
+                    "explanation": "",
+                    "recommendation": "",
                 })
         except Exception as e:
             console.print(f"[red]failed: {e}[/red]")
-            rows.append({"source": src, "category": "_error", "severity": "critical", "explanation": str(e)})
+            out_rows.append({
+                "customer_name": name,
+                "customer_number": number,
+                "url": src,
+                "overall_severity": "error",
+                "call_summary": str(e),
+                "flag_category": "_error",
+                "flag_severity": "critical",
+                "timestamp": "", "speaker": "", "quote": "", "explanation": str(e), "recommendation": "",
+            })
 
-    if csv_out:
-        csv_out.parent.mkdir(parents=True, exist_ok=True)
-        with open(csv_out, "w", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=["source", "overall_severity", "category", "severity", "timestamp", "speaker", "quote", "explanation"])
-            w.writeheader()
-            for r in rows:
-                w.writerow(r)
-        console.print(f"[green]CSV written: {csv_out}[/green]")
+    csv_out.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "customer_name", "customer_number", "url",
+        "overall_severity", "call_summary",
+        "flag_category", "flag_severity", "timestamp", "speaker",
+        "quote", "explanation", "recommendation",
+    ]
+    with open(csv_out, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w.writeheader()
+        for r in out_rows:
+            w.writerow({k: r.get(k, "") for k in fieldnames})
+    console.print(f"[green]Summary CSV → {csv_out}[/green] ({len(out_rows)} rows)")
 
 
 @app.command("init-config")

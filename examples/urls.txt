@@ -1,5 +1,0 @@
-# One audio URL or local file path per line. Lines starting with # are ignored.
-# Used by:  arrowhead-qa batch examples/urls.txt --csv reports/summary.csv
-#
-# https://voicebot-calls-prod.s3.amazonaws.com/.../call1.wav?...
-# /path/to/local/call2.wav
