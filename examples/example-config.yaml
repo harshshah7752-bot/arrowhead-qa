@@ -1,0 +1,39 @@
+# Example tweak: stricter healthcare-specific config.
+# Copy any block from config/default.yaml and override here.
+
+model:
+  name: gemini-2.5-pro
+  temperature: 0.0          # max determinism for QA
+
+analysis:
+  expected_language: hi-en
+  min_severity: medium      # hide low-severity noise from the rendered report
+
+persona: |
+  You are a senior QA analyst for an AI voice bot used by an Indian healthcare
+  insurance company. You are bilingual (Hindi/English) and pay close attention
+  to consent, disclaimer language, and customer rejection signals. You never
+  hallucinate flags; every flag must cite verbatim audio.
+
+custom_rules:
+  - id: must_state_company_disclaimer
+    severity: critical
+    description: |
+      Bot MUST state "This call is being recorded for quality" (English) or
+      "Yeh call quality ke liye record ki ja rahi hai" (Hindi) within first 30 seconds.
+  - id: stop_on_no_three_times
+    severity: critical
+    description: |
+      If customer says any form of "no thank you" / "nahi chahiye" three times,
+      bot MUST acknowledge and end the call politely instead of re-pitching.
+  - id: no_health_advice
+    severity: critical
+    description: |
+      Bot must never give medical or diagnostic advice. Refer to a doctor.
+
+# Disable categories you don't care about, e.g.:
+# categories:
+#   - id: background_noise_ignored
+#     enabled: false
+#     severity: low
+#     description: ignored

@@ -1,0 +1,170 @@
+# arrowhead-qa default configuration
+# Copy to ./arrowhead-qa.yaml (gitignored) or pass --config <path> to override.
+# Any field present in user config overrides the same field here.
+
+model:
+  name: gemini-2.5-pro          # gemini-2.5-pro | gemini-2.5-flash
+  temperature: 0.1
+  max_retries: 2                # JSON-schema retry on bad output
+
+analysis:
+  # Audio language hint — affects diarization quality. "auto" lets Gemini detect.
+  expected_language: auto       # auto | en | hi | hi-en | other ISO
+  # Only flags at or above this severity make it into the rendered report
+  # (raw JSON still contains everything).
+  min_severity: low             # low | medium | high | critical
+  # Single-pass analyzes audio directly. Two-pass transcribes first, then analyzes text+audio.
+  mode: single_pass             # single_pass | two_pass
+
+output:
+  save_json: true
+  save_markdown: true
+  reports_dir: reports
+
+# Persona Gemini adopts.
+persona: |
+  You are a senior QA analyst for an AI voice bot that calls customers in India.
+  You speak fluent English and Hindi. You are strict, exhaustive, and grounded
+  in audio evidence — never invent issues. Cite verbatim quotes. Use audio
+  signals (silences, overlaps, tone, prosody) in addition to words.
+
+# Error categories. Disable by setting enabled: false. Add custom ones freely.
+# severity is the DEFAULT severity if Gemini doesn't specify per-instance.
+categories:
+  - id: repeated_greeting
+    enabled: true
+    severity: medium
+    description: Customer or bot says hello/hi/hey 2+ times — signals bot not hearing or connection issue.
+  - id: bot_self_repetition
+    enabled: true
+    severity: high
+    description: Bot repeats same or near-identical sentence within the call.
+  - id: customer_repetition
+    enabled: true
+    severity: high
+    description: Customer forced to repeat themselves because bot did not catch it.
+  - id: long_silence
+    enabled: true
+    severity: medium
+    description: Bot fails to respond to a customer turn within a reasonable window (dead air >2s).
+  - id: no_response_to_question
+    enabled: true
+    severity: high
+    description: Customer asks a question and bot ignores or gives a non-answer.
+  - id: misunderstanding
+    enabled: true
+    severity: high
+    description: Bot answers wrong intent, off-topic, or misreads customer sentiment.
+  - id: interruption
+    enabled: true
+    severity: medium
+    description: Bot cuts off customer mid-sentence.
+  - id: talk_over
+    enabled: true
+    severity: low
+    description: Bot and customer speak simultaneously.
+  - id: wrong_language
+    enabled: true
+    severity: high
+    description: Bot replies in a language customer did not use, or unwanted code-switching.
+  - id: unnatural_phrasing
+    enabled: true
+    severity: low
+    description: Robotic, awkward, or ungrammatical bot output.
+  - id: hallucination
+    enabled: true
+    severity: critical
+    description: Bot states facts not grounded — wrong name, amount, date, or fabricated policy.
+  - id: pii_leak
+    enabled: true
+    severity: critical
+    description: Bot reveals sensitive info inappropriately.
+  - id: compliance_issue
+    enabled: true
+    severity: critical
+    description: Missed disclosure, missed consent, or regulatory failure.
+  - id: tone_mismatch
+    enabled: true
+    severity: medium
+    description: Bot tone inappropriate for context (cheerful during complaint, etc.).
+  - id: customer_frustration
+    enabled: true
+    severity: medium
+    description: Customer expresses anger, swears, sighs, or laughs dismissively.
+  - id: asked_for_human
+    enabled: true
+    severity: high
+    description: Customer requests a human agent; bot fails to escalate.
+  - id: hangup_threat
+    enabled: true
+    severity: high
+    description: Customer threatens to hang up.
+  - id: premature_hangup
+    enabled: true
+    severity: high
+    description: Bot ends call before completing task or addressing customer.
+  - id: loop
+    enabled: true
+    severity: critical
+    description: Bot stuck repeating the same flow / IVR-like loop despite customer pushback.
+  - id: dtmf_or_ivr_confusion
+    enabled: true
+    severity: medium
+    description: Customer presses keys or expects IVR behavior the bot does not handle.
+  - id: background_noise_ignored
+    enabled: false
+    severity: low
+    description: Bot ignores clear noise or third-party signals on the line.
+  - id: wrong_name_usage
+    enabled: true
+    severity: high
+    description: Bot uses incorrect customer name.
+  - id: context_loss
+    enabled: true
+    severity: high
+    description: Bot forgets info given earlier in the same call.
+  - id: promise_broken
+    enabled: true
+    severity: high
+    description: Bot promises an action it cannot actually take.
+  - id: unclear_purpose
+    enabled: true
+    severity: medium
+    description: Bot fails to state the purpose of the call early on.
+  - id: abrupt_topic_shift
+    enabled: true
+    severity: low
+    description: Bot jumps topics without transition.
+  - id: data_capture_failure
+    enabled: true
+    severity: high
+    description: Bot fails to capture stated info (amount, date, account, name).
+  - id: confirmation_missing
+    enabled: true
+    severity: medium
+    description: Bot does not confirm critical info back to the customer.
+  - id: negative_sentiment_unaddressed
+    enabled: true
+    severity: medium
+    description: Customer is upset; bot proceeds without acknowledging.
+  - id: other
+    enabled: true
+    severity: low
+    description: Anything else suspicious; explain in the explanation field.
+
+# Optional few-shot examples to anchor Gemini's judgement. Add real edge cases here.
+few_shot: []
+# Example:
+# few_shot:
+#   - input: "bot: namaste\nbot: hello\ncustomer: hello\ncustomer: hello\ncustomer: hello"
+#     flag:
+#       category: repeated_greeting
+#       severity: high
+#       explanation: Customer said hello three times because bot was not transmitting audio.
+
+# Free-form rules layered on top of the categories. Use to inject company-specific
+# policy ("never offer discounts above 20%", "must say disclaimer X within first 30s").
+custom_rules: []
+# - id: must_state_disclaimer
+#   severity: critical
+#   description: Bot must say "This call is recorded" within the first 30 seconds.

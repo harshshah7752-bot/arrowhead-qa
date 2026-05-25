@@ -1,0 +1,11 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.playwright-profile/
+reports/
+*.egg-info/
+build/
+dist/
+arrowhead-qa.yaml
+.DS_Store
