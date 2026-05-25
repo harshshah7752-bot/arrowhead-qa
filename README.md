@@ -24,7 +24,7 @@ The `audio` mode is the recommended path. `dashboard` mode is a fallback.
 Requires Python ≥ 3.10.
 
 ```bash
-git clone https://github.com/<you>/arrowhead-qa
+git clone https://github.com/harshshah7752-bot/arrowhead-qa
 cd arrowhead-qa
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
